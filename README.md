@@ -1,6 +1,8 @@
-📌 Housing Price Prediction & Analysis 
+# 📌 Housing Price Prediction & Analysis 
+
 ---
-# 🧠 Description
+
+## 🧠 Description
 This project is a tool for analyzing and predicting housing prices in Poland based on data collected via web scraping from Otodom.
 
 ## 🚧 Status
