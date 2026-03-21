@@ -1,7 +1,8 @@
 import requests as r
 from bs4 import BeautifulSoup
-import time
+from datetime import datetime 
 import pandas as pd
+import re
 
 class Scraper:
     def __init__(self, transaction_type: str = 'sprzedaz', 
@@ -44,16 +45,20 @@ class Scraper:
         """scraping of the html page given"""
         soup = BeautifulSoup(html_content, 'html.parser')
         code = soup.find('div', {'data-cy': 'search.listing.organic'}).find_all('article', {'data-sentry-element': 'Container'}) 
-        
-        res = {}
+        timestamp = datetime.now().strftime("%d.%m.%y %H:%M:%S")
+        result = []
+
         # loop for every advertisement on the site
         for ad in code:
             if ad.get('role') == None: 
-                name = ad.find('p', {'data-cy': 'listing-item-title'}).get_text()  
+                name = ad.find('p', {'data-cy': 'listing-item-title'}).get_text()
+                url = ad.find('a', {'data-cy': 'listing-item-link'}).get('href')
             elif ad.get('role') == 'presentation':
                 name = ad.find('p', {'data-sentry-element': 'Title'}).get_text()
+                url = ad.find('a', {'data-sentry-element': 'Link'}).get('href')
             else: 
-                name = None  
+                name = None 
+            id = re.search(r'ID\w+', url).group()
             place = ad.find('p', {'data-sentry-component': 'Address'}).get_text()
             price = ad.find('span', {'data-sentry-element': "MainPrice"}).get_text()
             rooms_size_floor = ad.find('dl', {'data-sentry-element': "StyledDescriptionList"}).find_all('span')
@@ -63,19 +68,33 @@ class Scraper:
                 rooms, size = [i.get_text() for i in rooms_size_floor]
                 floor = None
 
-            res[name]=[price, place, rooms, size, floor]
+            result.append({'id': id, 
+                            'name': name, 
+                            'url': url, 
+                            'place': place,
+                            #'province': None,
+                            #'city': None, 
+                            #'district': None, 
+                            #'street': None, 
+                            'rooms': rooms, 
+                            'size': size,
+                            'market': self.market_type,
+                            'timestamp': timestamp
+                        })
 
-        return res
+
+        return result
 
     def run(self):
         """running scraping of every available page based on the filter settings"""
-        response = r.get(self.url, headers=self._headers)
-        response.raise_for_status()
-        # TODO
+        while True:
+            response = r.get(self.url, headers=self._headers)
+            response.raise_for_status()
+       
     
 if __name__ == "__main__":
     scraper = Scraper()
     content = scraper.open_test_page()
     result = scraper.scrape(content)
-    df = pd.DataFrame.from_dict(result, orient='index')
+    df = pd.DataFrame(result)
     print(df)
