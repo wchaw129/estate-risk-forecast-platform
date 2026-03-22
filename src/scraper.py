@@ -74,8 +74,13 @@ class Scraper:
                 name = None 
 
             id = re.search(r'ID\w+', url).group()
+
             place = ad.find('p', {'data-sentry-component': 'Address'}).get_text()
-            price = ad.find('span', {'data-sentry-element': "MainPrice"}).get_text()
+            
+            price_dirty = ad.find('span', {'data-sentry-element': "MainPrice"}).get_text().replace('\xa0', '').replace(' ', '')
+            price = re.search(r"\d+", price_dirty).group()
+            currency = re.search(r"\D+", price_dirty).group()
+
 
             rooms_size_floor = ad.find('dl', {'data-sentry-element': "StyledDescriptionList"}).find_all('span')
             texts = [i.get_text() for i in rooms_size_floor]
@@ -90,14 +95,11 @@ class Scraper:
                             'name': name, 
                             'url': url, 
                             'place': place,
-                            'price': price,
+                            'price': int(price),
+                            'currency': currency,
                             'floor': floor,
-                            #'province': None,
-                            #'city': None, 
-                            #'district': None, 
-                            #'street': None, 
-                            'rooms': rooms, 
-                            'size': size,
+                            'rooms': int(rooms), 
+                            'size': float(size),
                             'market': self.market_type,
                             'timestamp': timestamp
                         })
@@ -134,13 +136,10 @@ class Scraper:
     
 if __name__ == "__main__":
     scraper = Scraper()
-    '''for i, page_data in enumerate(scraper.run()):
+    for i, page_data in enumerate(scraper.run()):
         print(f'page {i} loaded, len: {len(page_data)}')
 
         df_page = pd.DataFrame(page_data)
         print(df_page.head(3))
         if i == 1:
-            break'''
-    content = scraper.open_test_page()
-    df = pd.DataFrame(scraper.scrape(content))
-    df.to_csv('tests/test.csv')
+            break
