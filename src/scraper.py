@@ -26,8 +26,14 @@ class Scraper:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7'
         })
-    
-    
+        
+    @staticmethod
+    def _get_val(text: str):
+        match = re.search(r"\d+([.]?\d+)?", text)
+        if match: 
+            return match.group()
+        return None
+
     @property
     def url(self) -> str:
         """get url based on the filter"""
@@ -57,6 +63,7 @@ class Scraper:
 
         # loop for every advertisement on the site
         for ad in code:
+
             if ad.get('role') == None: 
                 name = ad.find('p', {'data-cy': 'listing-item-title'}).get_text()
                 url = ad.find('a', {'data-cy': 'listing-item-link'}).get('href')
@@ -65,20 +72,26 @@ class Scraper:
                 url = ad.find('a', {'data-sentry-element': 'Link'}).get('href')
             else: 
                 name = None 
+
             id = re.search(r'ID\w+', url).group()
             place = ad.find('p', {'data-sentry-component': 'Address'}).get_text()
             price = ad.find('span', {'data-sentry-element': "MainPrice"}).get_text()
+
             rooms_size_floor = ad.find('dl', {'data-sentry-element': "StyledDescriptionList"}).find_all('span')
-            if len(rooms_size_floor) == 3:
-                rooms, size, floor = [i.get_text() for i in rooms_size_floor]
-            else:
-                rooms, size = [i.get_text() for i in rooms_size_floor]
-                floor = None
+            texts = [i.get_text() for i in rooms_size_floor]
+
+            rooms = self._get_val(texts[0])
+            size = self._get_val(texts[1])
+            if len(texts) == 3:
+                floor = self._get_val(texts[2]) or 'parter'
+            else: floor = None
 
             result.append({'id': id, 
                             'name': name, 
                             'url': url, 
                             'place': place,
+                            'price': price,
+                            'floor': floor,
                             #'province': None,
                             #'city': None, 
                             #'district': None, 
@@ -121,10 +134,13 @@ class Scraper:
     
 if __name__ == "__main__":
     scraper = Scraper()
-    for i, page_data in enumerate(scraper.run()):
+    '''for i, page_data in enumerate(scraper.run()):
         print(f'page {i} loaded, len: {len(page_data)}')
 
         df_page = pd.DataFrame(page_data)
         print(df_page.head(3))
         if i == 1:
-            break
+            break'''
+    content = scraper.open_test_page()
+    df = pd.DataFrame(scraper.scrape(content))
+    df.to_csv('tests/test.csv')
