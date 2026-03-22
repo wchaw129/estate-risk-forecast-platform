@@ -3,6 +3,8 @@ from bs4 import BeautifulSoup
 from datetime import datetime 
 import pandas as pd
 import re
+import time
+import random
 
 class Scraper:
     def __init__(self, transaction_type: str = 'sprzedaz', 
@@ -16,9 +18,14 @@ class Scraper:
         self.market_type = market_type
         self.province = province
         self.city = city
+        self.page = 1
 
         self._base_url = "https://www.otodom.pl/pl/wyniki"
-        self._headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+        self.session = r.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7'
+        })
     
     
     @property
@@ -26,7 +33,7 @@ class Scraper:
         """get url based on the filter"""
         return (
             f"{self._base_url}/{self.transaction_type}/{self.estate_type},{self.market_type}/{self.province}/"
-            f"{self.city}?limit=72&ownerTypeSingleSelect=ALL&by=LATEST&direction=DESC"
+            f"{self.city}?limit=72&ownerTypeSingleSelect=ALL&by=LATEST&direction=DESC&page={self.page}"
         )
     
     
@@ -87,14 +94,37 @@ class Scraper:
 
     def run(self):
         """running scraping of every available page based on the filter settings"""
+        self.page = 1
+        previous_url = None
         while True:
-            response = r.get(self.url, headers=self._headers)
-            response.raise_for_status()
+            print(f"Scanning page: {self.page}")
+            if self.page > 1:
+                self.session.headers.update({'Referer': previous_url})
+
+            try:
+                response = self.session.get(self.url)
+                response.raise_for_status()
+            except r.exceptions.RequestException as error:
+                print(f"connection error page {self.page}: {error}")
+                break
+
+            if response.url == previous_url:
+                break
+            
+            yield self.scrape(response.text)
+
+            previous_url = response.url
+            self.page = self.page + 1
+            
+            time.sleep(random.uniform(5, 10))
        
     
 if __name__ == "__main__":
     scraper = Scraper()
-    content = scraper.open_test_page()
-    result = scraper.scrape(content)
-    df = pd.DataFrame(result)
-    print(df)
+    for i, page_data in enumerate(scraper.run()):
+        print(f'page {i} loaded, len: {len(page_data)}')
+
+        df_page = pd.DataFrame(page_data)
+        print(df_page.head(3))
+        if i == 1:
+            break
