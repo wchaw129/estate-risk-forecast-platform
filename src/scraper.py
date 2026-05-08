@@ -11,14 +11,17 @@ class Scraper:
                  estate_type: str = 'mieszkanie', 
                  market_type: str = 'rynek-wtorny',
                  province: str = 'dolnoslaskie', 
-                 city: str = 'wroclaw'):
+                 city: str = 'wroclaw',
+                 start_page: int = 1,
+                 max_page: int = 3):
         
         self.transaction_type = transaction_type
         self.estate_type = estate_type
         self.market_type = market_type
         self.province = province
         self.city = city
-        self.page = 1
+        self.page = start_page
+        self.max_page = max_page
 
         self._base_url = "https://www.otodom.pl/pl/wyniki"
         self.session = r.Session()
@@ -42,6 +45,9 @@ class Scraper:
             f"{self.city}?limit=72&ownerTypeSingleSelect=ALL&by=LATEST&direction=DESC&page={self.page}"
         )
     
+    def find_max_page(self, body):
+        #TODO
+        pass
     
     def download_test_page(self, file_name: str = 'example.html'):
         """downloads test page from otodom with .html format"""
@@ -91,9 +97,11 @@ class Scraper:
                 floor = self._get_val(texts[2]) or 'parter'
             else: floor = None
 
-            result.append({'id': id, 
+            result.append({'id_property': id, 
                             'name': name, 
                             'url': url, 
+                            'city': self.city,
+                            'province': self.province,
                             'place': place,
                             'price': int(price),
                             'currency': currency,
@@ -109,9 +117,12 @@ class Scraper:
 
     def run(self):
         """running scraping of every available page based on the filter settings"""
-        self.page = 1
+        self.page = 48
         previous_url = None
         while True:
+            if self.page == self.max_page:
+                break
+
             print(f"Scanning page: {self.page}")
             if self.page > 1:
                 self.session.headers.update({'Referer': previous_url})
@@ -136,10 +147,10 @@ class Scraper:
     
 if __name__ == "__main__":
     scraper = Scraper()
+    print(scraper.url)
     for i, page_data in enumerate(scraper.run()):
         print(f'page {i} loaded, len: {len(page_data)}')
 
         df_page = pd.DataFrame(page_data)
         print(df_page.head(3))
-        if i == 1:
-            break
+  
